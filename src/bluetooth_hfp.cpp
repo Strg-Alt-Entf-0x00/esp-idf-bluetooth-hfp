@@ -75,6 +75,11 @@ static constexpr int kMaxBonds = 20;
 // ============================================================================
 
 static bool              s_bt_initialized      = false;
+static bool              s_controller_initialized = false;
+static bool              s_controller_enabled = false;
+static bool              s_bluedroid_initialized = false;
+static bool              s_bluedroid_enabled = false;
+static bool              s_hfp_initialized = false;
 static bool              s_sco_active          = false;
 static bool              s_auto_connect        = false;
 
@@ -936,12 +941,14 @@ esp_err_t init(const char* device_name) {
         ESP_LOGE(TAG, "BT ctrl init: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_controller_initialized = true;
 
     ret = esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "BT ctrl enable: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_controller_enabled = true;
 
     // Bluedroid stack
     esp_bluedroid_config_t bd_cfg = BT_BLUEDROID_INIT_CONFIG_DEFAULT();
@@ -950,12 +957,14 @@ esp_err_t init(const char* device_name) {
         ESP_LOGE(TAG, "Bluedroid init: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_bluedroid_initialized = true;
 
     ret = esp_bluedroid_enable();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Bluedroid enable: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_bluedroid_enabled = true;
 
     // Device name
     const char* name = (device_name && device_name[0]) ? device_name : "ESP32-HFP";
@@ -994,6 +1003,7 @@ esp_err_t init(const char* device_name) {
         ESP_LOGE(TAG, "HFP HF init: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_hfp_initialized = true;
 
     // Make discoverable
     esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
@@ -1210,14 +1220,27 @@ esp_err_t deinit() {
         s_reconnect_task_hdl = nullptr;
     }
 
-    if (!s_bt_initialized) return ESP_OK;
-
 #ifdef CONFIG_BT_ENABLED
-    esp_hf_client_deinit();
-    esp_bluedroid_disable();
-    esp_bluedroid_deinit();
-    esp_bt_controller_disable();
-    esp_bt_controller_deinit();
+    if (s_hfp_initialized) {
+        esp_hf_client_deinit();
+        s_hfp_initialized = false;
+    }
+    if (s_bluedroid_enabled) {
+        esp_bluedroid_disable();
+        s_bluedroid_enabled = false;
+    }
+    if (s_bluedroid_initialized) {
+        esp_bluedroid_deinit();
+        s_bluedroid_initialized = false;
+    }
+    if (s_controller_enabled) {
+        esp_bt_controller_disable();
+        s_controller_enabled = false;
+    }
+    if (s_controller_initialized) {
+        esp_bt_controller_deinit();
+        s_controller_initialized = false;
+    }
 #endif
 
     if (s_sco_tx_ringbuf) { vRingbufferDelete(s_sco_tx_ringbuf); s_sco_tx_ringbuf = nullptr; }
@@ -1227,6 +1250,9 @@ esp_err_t deinit() {
     if (s_connection_semaphore) { vSemaphoreDelete(s_connection_semaphore); s_connection_semaphore = nullptr; }
 
     s_bt_initialized = false;
+    s_sco_active = false;
+    s_sync_conn_hdl = 0;
+    s_sco_sample_rate = 0;
     ESP_LOGI(TAG, "BT deinitialized");
     return ESP_OK;
 }
