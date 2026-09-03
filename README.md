@@ -4,18 +4,18 @@ An ESP-IDF Bluetooth Classic Hands-Free Profile client component with SCO audio 
 
 ## Status
 
-This is the initial extracted component release (`0.1.0`). It targets the ESP32 Classic Bluetooth stack and requires an ESP-IDF installation with Bluedroid and the SBC codec sources available.
+This is the initial extracted component release (`0.1.0`). It targets the ESP32 Classic Bluetooth stack and is validated with ESP-IDF 6.0.2. It requires Bluedroid and the SBC codec sources available in that ESP-IDF installation.
 
 The component exposes Bluetooth and audio callbacks. It has no dependency on an application UART, PC protocol, or project-specific transport layer.
 
 ## Requirements
 
-- ESP-IDF 5.x
+- ESP-IDF 6.0.2 or newer
 - ESP32 target with Bluetooth Classic support
 - Bluedroid enabled in the project configuration
 - Classic Bluetooth HFP client enabled
 
-The current implementation also contains the existing ESP32 DAC playback path. Board-specific audio output should be made configurable before supporting additional hardware targets.
+The component currently exposes decoded SCO audio through its application callback. Board-specific DAC playback is not part of the supported public behavior.
 
 ## Integration
 

@@ -7,4 +7,4 @@ issues: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-bluetooth-hfp/issues"
 targets:
   - esp32
 dependencies:
-  idf: ">=5.0"
+  idf: ">=6.0.2"
