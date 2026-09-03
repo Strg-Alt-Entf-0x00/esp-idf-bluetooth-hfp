@@ -1,0 +1,10 @@
+version: "0.1.0"
+description: "Bluetooth Hands-Free Profile client with SCO audio for ESP-IDF"
+license: "Apache-2.0"
+url: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-bluetooth-hfp"
+repository: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-bluetooth-hfp.git"
+issues: "https://github.com/Strg-Alt-Entf-0x00/esp-idf-bluetooth-hfp/issues"
+targets:
+  - esp32
+dependencies:
+  idf: ">=5.0"
