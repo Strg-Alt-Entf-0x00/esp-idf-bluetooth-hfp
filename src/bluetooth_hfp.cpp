@@ -5,7 +5,6 @@
 // Role:   Hands-Free (HF) - ESP32 presents itself as a phone headset
 // Profile: HFP 1.7, WBS (mSBC 16kHz) + CVSD (8kHz) fallback
 // Audio:  HCI path - SCO audio routed through application (no I2S hardware needed)
-// DAC:    dac_continuous driver (GPIO25/26) for phone-audio playback + tones
 // ============================================================================
 
 #include "bluetooth_hfp.h"
