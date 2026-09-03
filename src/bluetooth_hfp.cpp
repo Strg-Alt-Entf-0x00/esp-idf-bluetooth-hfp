@@ -38,7 +38,7 @@ extern "C" {
 #include "sbc_encoder.h"
 }
 
-            emit_status_message(status);
+namespace bluetooth_hfp {
 
 // ============================================================================
 // Constants
@@ -63,7 +63,6 @@ static void escape_json_string(const char* input, char* output, size_t output_si
             }
             output[out++] = c;
         }
-            // This function is retained for context
     }
     output[out] = '\0';
 }
