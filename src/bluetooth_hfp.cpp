@@ -1273,8 +1273,8 @@ esp_err_t start_hfp_audio_gateway() {
         return ESP_FAIL;
     }
 
-    if (xTaskCreatePinnedToCore(boot_connect_task, "bt-boot-connect",
-                                3072, nullptr, 5, nullptr, 0) != pdPASS) {
+    if (s_auto_connect && xTaskCreatePinnedToCore(boot_connect_task, "bt-boot-connect",
+                                                   3072, nullptr, 5, nullptr, 0) != pdPASS) {
         ESP_LOGW(TAG, "Boot auto-connect task could not be created");
     }
 
