@@ -673,14 +673,27 @@ static void hf_client_cb(esp_hf_client_cb_event_t event, esp_hf_client_cb_param_
         const bool connected = param->conn_stat.state == ESP_HF_CLIENT_CONNECTION_STATE_CONNECTED ||
                        param->conn_stat.state == ESP_HF_CLIENT_CONNECTION_STATE_SLC_CONNECTED;
         const bool connecting = param->conn_stat.state == ESP_HF_CLIENT_CONNECTION_STATE_CONNECTING;
-        ESP_LOGI(TAG, "HFP: %s state=%d peer_feat=0x%08lx chld_feat=0x%08lx [%02x:%02x:%02x:%02x:%02x:%02x]",
-                 connected ? "CONNECTED" : (connecting ? "CONNECTING" : "DISCONNECTED"),
+           ESP_LOGI(TAG, "HFP: %s state=%d peer_feat=0x%08lx chld_feat=0x%08lx [%02x:%02x:%02x:%02x:%02x:%02x]",
+               connected ? "CONNECTED" : (connecting ? "CONNECTING" : "DISCONNECTED"),
              static_cast<int>(param->conn_stat.state),
              static_cast<unsigned long>(param->conn_stat.peer_feat),
              static_cast<unsigned long>(param->conn_stat.chld_feat),
                  param->conn_stat.remote_bda[0], param->conn_stat.remote_bda[1],
                  param->conn_stat.remote_bda[2], param->conn_stat.remote_bda[3],
                  param->conn_stat.remote_bda[4], param->conn_stat.remote_bda[5]);
+        char diagnostic[192];
+        std::snprintf(diagnostic, sizeof(diagnostic),
+                  "{\"event\":\"hfp_connection_state\",\"state\":%d,"
+                  "\"connected\":%s,\"peer_feat\":%lu,\"chld_feat\":%lu,"
+                  "\"bda\":\"%02x:%02x:%02x:%02x:%02x:%02x\"}",
+                  static_cast<int>(param->conn_stat.state),
+                  connected ? "true" : "false",
+                  static_cast<unsigned long>(param->conn_stat.peer_feat),
+                  static_cast<unsigned long>(param->conn_stat.chld_feat),
+                  param->conn_stat.remote_bda[0], param->conn_stat.remote_bda[1],
+                  param->conn_stat.remote_bda[2], param->conn_stat.remote_bda[3],
+                  param->conn_stat.remote_bda[4], param->conn_stat.remote_bda[5]);
+        emit_status_message(diagnostic);
 
         if (s_mutex && xSemaphoreTake(s_mutex, pdMS_TO_TICKS(500)) == pdTRUE) {
             std::memcpy(s_conn_info.device.bda, param->conn_stat.remote_bda, 6);
