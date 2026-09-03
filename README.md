@@ -15,7 +15,7 @@ The component exposes Bluetooth and audio callbacks. It has no dependency on an 
 - Bluedroid enabled in the project configuration
 - Classic Bluetooth HFP client enabled
 
-The component currently exposes decoded SCO audio through its application callback. Board-specific DAC playback is not part of the supported public behavior.
+The component exposes decoded SCO audio through its application callback. Board-specific audio output is the application's responsibility.
 
 ## Integration
 

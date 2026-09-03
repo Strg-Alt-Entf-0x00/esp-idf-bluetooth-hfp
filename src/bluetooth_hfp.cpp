@@ -12,7 +12,6 @@
 
 #include <cstring>
 #include <atomic>
-#include <cmath>
 #include <algorithm>
 #include <cstdio>
 #include <vector>
@@ -28,7 +27,6 @@
 #include "esp_bt_main.h"
 #include "esp_gap_bt_api.h"
 #include "esp_hf_client_api.h"
-#include "driver/dac_continuous.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "sdkconfig.h"
@@ -70,12 +68,6 @@ static void escape_json_string(const char* input, char* output, size_t output_si
 // SCO ringbuffer: 500ms at 8kHz = 8192 bytes (Industrial-Grade Jitter Buffer)
 static constexpr size_t SCO_TX_RINGBUF_SIZE = 8192; // PC audio -> SCO to phone
 static constexpr size_t SCO_RX_RINGBUF_SIZE = 8192; // SCO from phone -> PC
-
-// DAC configuration (same as ESPricht32 reference)
-static constexpr uint32_t DAC_SAMPLE_RATE = 32000;  // 32kHz (ESP32 DAC continuous min is ~20kHz). We upsample in software.
-static constexpr size_t   DAC_BUF_SIZE    = 512;
-static constexpr size_t   DAC_DESC_NUM    = 4;
-static constexpr int      DAC_PRIORITY    = 22;      // High, below max
 
 static constexpr int kMaxBonds = 20;
 
@@ -124,7 +116,6 @@ static RingbufHandle_t   s_sco_rx_ringbuf    = nullptr; // SCO from phone -> PC
 
 // Tasks
 static TaskHandle_t      s_sco_bridge_task   = nullptr;
-static TaskHandle_t      s_dac_consumer_task = nullptr;
 
 // mSBC Codec Contexts (for Wideband Speech when EXTERNAL_CODEC=y)
 static OI_CODEC_SBC_DECODER_CONTEXT s_sbc_decoder_ctx;
@@ -132,14 +123,6 @@ static OI_UINT32 s_sbc_decoder_data[CODEC_DATA_WORDS(1, SBC_CODEC_FAST_FILTER_BU
 static SBC_ENC_PARAMS s_sbc_encoder_ctx;
 static bool s_msbc_decoder_initialized = false;
 static bool s_msbc_encoder_initialized = false;
-
-// DAC for phone-audio playback + acoustic tones
-static dac_continuous_handle_t s_dac_handle  = nullptr;
-static volatile bool           s_dac_running = false;
-
-// DAC consumer ringbuffer (phone SCO audio -> DAC output)
-static constexpr size_t DAC_RINGBUF_SIZE = 8192; // 8KB ~500ms @ 8kHz
-static RingbufHandle_t  s_dac_ringbuf   = nullptr;
 
 // Scan results
 static std::vector<BluetoothDevice> s_scan_results;
@@ -157,190 +140,10 @@ static void reconnect_task_fn(void* arg);
 static void cancel_reconnect_task();
 static void boot_connect_task(void* arg);
 static esp_err_t scan_and_connect_once();
-static void dac_consumer_task(void* arg);
-static esp_err_t dac_init();
-static void dac_deinit();
-static void dac_queue_samples(const uint8_t* samples, size_t len);
-static void play_tone(uint32_t freq_hz, uint32_t duration_ms);
-static void play_boot_tones();
-static void play_connect_tone();
-static void play_disconnect_tone();
-static void play_error_tone();
 static void save_last_mac(const uint8_t* bda);
 static bool load_last_mac(uint8_t* bda_out);
 static void refresh_paired_devices_locked();
 static void trigger_auto_reconnect();
-
-// ============================================================================
-// DAC Driver (Producer-Consumer, dac_continuous API)
-// Pattern from ESPricht32 audio_hal reference
-// ============================================================================
-
-static esp_err_t dac_init() {
-    return ESP_OK; // [PIVOT] DAC deactivated
-    if (s_dac_handle) return ESP_OK;
-
-    s_dac_ringbuf = xRingbufferCreate(DAC_RINGBUF_SIZE, RINGBUF_TYPE_NOSPLIT);
-    if (!s_dac_ringbuf) {
-        ESP_LOGE(TAG, "DAC ringbuf alloc failed");
-        return ESP_ERR_NO_MEM;
-    }
-
-    dac_continuous_config_t cfg = {};
-    cfg.chan_mask = DAC_CHANNEL_MASK_CH0; // GPIO25 = DAC1
-    cfg.desc_num  = DAC_DESC_NUM;
-    cfg.buf_size  = DAC_BUF_SIZE;
-    cfg.freq_hz   = DAC_SAMPLE_RATE;
-    cfg.offset    = 0;
-    cfg.clk_src   = DAC_DIGI_CLK_SRC_DEFAULT;
-    cfg.chan_mode  = DAC_CHANNEL_MODE_SIMUL;
-    esp_err_t ret = dac_continuous_new_channels(&cfg, &s_dac_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "DAC init failed: %s", esp_err_to_name(ret));
-        vRingbufferDelete(s_dac_ringbuf);
-        s_dac_ringbuf = nullptr;
-        return ret;
-    }
-
-    ret = dac_continuous_enable(s_dac_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "DAC enable failed: %s", esp_err_to_name(ret));
-        dac_continuous_del_channels(s_dac_handle);
-        s_dac_handle = nullptr;
-        vRingbufferDelete(s_dac_ringbuf);
-        s_dac_ringbuf = nullptr;
-        return ret;
-    }
-
-    // Pre-fill silence (128 = midpoint for 8-bit unsigned DAC)
-    uint8_t silence_mid[256];
-    memset(silence_mid, 128, sizeof(silence_mid));
-    xRingbufferSend(s_dac_ringbuf, silence_mid, sizeof(silence_mid), 0);
-
-    s_dac_running = true;
-
-    BaseType_t r = xTaskCreatePinnedToCore(
-        dac_consumer_task, "dac-consumer",
-        2048, nullptr, DAC_PRIORITY,
-        &s_dac_consumer_task, 1
-    );
-    if (r != pdPASS) {
-        ESP_LOGE(TAG, "DAC consumer task create failed");
-        dac_continuous_disable(s_dac_handle);
-        dac_continuous_del_channels(s_dac_handle);
-        s_dac_handle = nullptr;
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI(TAG, "DAC init OK (GPIO25, 32kHz, 8-bit)");
-    return ESP_OK;
-}
-
-static void dac_deinit() {
-    return; // [PIVOT] DAC deactivated
-    s_dac_running = false;
-    if (s_dac_consumer_task) {
-        // Send sentinel byte to unblock task
-        if (s_dac_ringbuf) {
-            uint8_t sentinel = 0;
-            xRingbufferSend(s_dac_ringbuf, &sentinel, 1, pdMS_TO_TICKS(50));
-        }
-        vTaskDelay(pdMS_TO_TICKS(100));
-        s_dac_consumer_task = nullptr;
-    }
-    if (s_dac_handle) {
-        dac_continuous_disable(s_dac_handle);
-        dac_continuous_del_channels(s_dac_handle);
-        s_dac_handle = nullptr;
-    }
-    if (s_dac_ringbuf) {
-        vRingbufferDelete(s_dac_ringbuf);
-        s_dac_ringbuf = nullptr;
-    }
-}
-
-static void dac_consumer_task(void* arg) {
-    while (s_dac_running) {
-        size_t item_size = 0;
-        uint8_t* item = reinterpret_cast<uint8_t*>(
-            xRingbufferReceive(s_dac_ringbuf, &item_size, pdMS_TO_TICKS(50))
-        );
-        if (!item) continue;
-        if (item_size == 1 && !s_dac_running) {
-            vRingbufferReturnItem(s_dac_ringbuf, item);
-            break;
-        }
-        if (item_size > 0 && s_dac_handle) {
-            size_t written = 0;
-            dac_continuous_write(s_dac_handle, item, item_size, &written, portMAX_DELAY);
-        }
-        vRingbufferReturnItem(s_dac_ringbuf, item);
-    }
-    s_dac_consumer_task = nullptr;
-    vTaskDelete(nullptr);
-}
-
-// Queue audio samples (uint8_t, 0..255, midpoint=128) to DAC
-static void dac_queue_samples(const uint8_t* samples, size_t len) {
-    return; // [PIVOT] DAC deactivated
-    if (!s_dac_ringbuf || !samples || len == 0) return;
-    // Non-blocking: drop if full (tones are best-effort)
-    xRingbufferSend(s_dac_ringbuf, samples, len, pdMS_TO_TICKS(2));
-}
-
-// ============================================================================
-// Acoustic Tones (blocking, called from non-audio tasks only)
-// ============================================================================
-
-static void play_tone(uint32_t freq_hz, uint32_t duration_ms) {
-    return; // [PIVOT] DAC deactivated
-    if (!s_dac_handle || !s_dac_ringbuf) return;
-
-    const uint32_t num_samples = (DAC_SAMPLE_RATE * duration_ms) / 1000;
-    const float    two_pi      = 6.28318530718f;
-
-    // Generate in 128-sample chunks to limit stack usage
-    static uint8_t chunk[128];
-    uint32_t pos = 0;
-    while (pos < num_samples) {
-        uint32_t batch = std::min<uint32_t>(128, num_samples - pos);
-        for (uint32_t i = 0; i < batch; ++i) {
-            float s = sinf(two_pi * freq_hz * (pos + i) / DAC_SAMPLE_RATE);
-            chunk[i] = static_cast<uint8_t>((s + 1.0f) * 127.5f);
-        }
-        // Block until queued (tone generation is intentionally synchronous)
-        xRingbufferSend(s_dac_ringbuf, chunk, batch, pdMS_TO_TICKS(100));
-        pos += batch;
-    }
-
-    // Return to silence (128 = midpoint)
-    memset(chunk, 128, 64);
-    xRingbufferSend(s_dac_ringbuf, chunk, 64, pdMS_TO_TICKS(50));
-}
-
-static void play_boot_tones() {
-    if (!s_dac_handle) return;
-    play_tone(220, 80);  vTaskDelay(pdMS_TO_TICKS(40));
-    play_tone(440, 80);  vTaskDelay(pdMS_TO_TICKS(40));
-    play_tone(660, 120);
-}
-
-static void play_connect_tone() {
-    if (!s_dac_handle) return;
-    play_tone(440, 100); vTaskDelay(pdMS_TO_TICKS(40));
-    play_tone(880, 200);
-}
-
-static void play_disconnect_tone() {
-    if (!s_dac_handle) return;
-    play_tone(880, 100); vTaskDelay(pdMS_TO_TICKS(40));
-    play_tone(440, 200);
-}
-
-static void play_error_tone() {
-    if (!s_dac_handle) return;
-    play_tone(220, 500);
-}
 
 // ============================================================================
 // NVS: Persist last connected BT device MAC
@@ -628,32 +431,8 @@ static void hf_client_audio_rx_cb(esp_hf_sync_conn_hdl_t hdl, esp_hf_audio_buff_
         return;
     }
 
-    // Convert int16_t SCO samples to uint8_t for DAC (scale 16-bit -> 8-bit)
-    // SCO PCM: signed 16-bit. DAC: unsigned 8-bit (0=min, 128=mid, 255=max)
     const uint16_t num_samples = pcm_bytes / 2;
     if (num_samples > 0) {
-        // Upsampling to 32kHz:
-        // SCO is either 8kHz (60 samples/7.5ms) or 16kHz (120 samples/7.5ms).
-        // Target is 32000Hz (240 samples/7.5ms).
-        // Factor is simply 240 / num_samples (e.g. 240/60 = 4, 240/120 = 2).
-        uint16_t factor = 240 / num_samples;
-        if (factor == 0) factor = 1;
-
-        static uint8_t dac_buf[256]; 
-        uint16_t out_len = std::min<uint16_t>(num_samples * factor, sizeof(dac_buf));
-        const int16_t* pcm = pcm_data_ptr;
-
-        uint16_t out_idx = 0;
-        for (uint16_t i = 0; i < num_samples && out_idx < out_len; ++i) {
-            uint8_t dac_val = static_cast<uint8_t>((static_cast<int32_t>(pcm[i]) + 32768) >> 8);
-            for (uint16_t f = 0; f < factor && out_idx < out_len; ++f) {
-                dac_buf[out_idx++] = dac_val;
-            }
-        }
-
-        // Queue to DAC for playback (phone voice -> speaker)
-        dac_queue_samples(dac_buf, out_idx);
-
         xRingbufferSend(s_sco_rx_ringbuf, pcm_data_ptr, pcm_bytes, 0);
 
         // Send raw PCM directly to PC via UART transport
@@ -844,7 +623,6 @@ static void bt_gap_cb(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t* param)
                           "{\"event\":\"bt_auth_result\",\"ok\":false,\"status\":%d}",
                           param->auth_cmpl.stat);
             emit_status_message(status);
-            play_error_tone();
         }
         break;
 
@@ -921,13 +699,11 @@ static void hf_client_cb(esp_hf_client_cb_event_t event, esp_hf_client_cb_param_
             s_manual_disconnect = false;
             s_connection_attempt_in_progress.store(false, std::memory_order_relaxed);
             s_reconnect_task_active.store(false, std::memory_order_release);
-            play_connect_tone();
         } else if (!connecting) {
             s_connection_attempt_in_progress.store(false, std::memory_order_relaxed);
             s_sco_active = false;
             s_sync_conn_hdl = 0;
             s_sco_sample_rate = 0;
-            play_disconnect_tone();
             // Re-enable discoverability
             esp_bt_gap_set_scan_mode(ESP_BT_CONNECTABLE, ESP_BT_GENERAL_DISCOVERABLE);
             ++s_stats.disconnects;
@@ -1145,12 +921,7 @@ esp_err_t init(const char* device_name) {
         return ESP_ERR_NO_MEM;
     }
 
-    // Initialize DAC (GPIO25) for tones + phone audio playback
-    esp_err_t ret = dac_init();
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "DAC init failed (%s) - audio tones disabled", esp_err_to_name(ret));
-        // Non-fatal: BT can work without DAC
-    }
+    esp_err_t ret = ESP_OK;
 
 #ifdef CONFIG_BT_ENABLED
     // Release BLE memory (Classic BT only)
@@ -1235,18 +1006,14 @@ esp_err_t init(const char* device_name) {
     s_conn_status    = ConnectionStatus::DISCONNECTED;
     s_call_state     = CallState::IDLE;
 
-    ESP_LOGI(TAG, "[OK] BT stack ready | name=%s | HFP HF | WBS=%s | DAC=%s",
+    ESP_LOGI(TAG, "BT stack ready | name=%s | HFP HF | WBS=%s",
              name,
-             "enabled",
-             s_dac_handle ? "GPIO25" : "off");
+             "enabled");
 
 #else
     ESP_LOGW(TAG, "CONFIG_BT_ENABLED not set");
     s_bt_initialized = true;
 #endif
-
-    // Boot tones: 3 ascending beeps (A3->A4->A5)
-    play_boot_tones();
 
     return ESP_OK;
 }
@@ -1439,8 +1206,6 @@ esp_err_t set_device_name(const char* name) {
 esp_err_t deinit() {
     ESP_LOGI(TAG, "Deinitializing BT HFP...");
     stop_hfp_audio_gateway();
-    dac_deinit();
-    
     if (s_reconnect_task_hdl) {
         vTaskDelete(s_reconnect_task_hdl);
         s_reconnect_task_hdl = nullptr;

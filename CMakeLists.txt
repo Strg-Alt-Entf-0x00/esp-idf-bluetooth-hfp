@@ -30,7 +30,7 @@ idf_component_register(
          "${BLUEDROID_DIR}/external/sbc/encoder/srce/sbc_enc_coeffs.c"
          "${BLUEDROID_DIR}/external/sbc/encoder/srce/sbc_encoder.c"
          "${BLUEDROID_DIR}/external/sbc/encoder/srce/sbc_packing.c"
-    REQUIRES esp_driver_dac esp_system freertos nvs_flash esp_ringbuf
+    REQUIRES esp_system freertos nvs_flash esp_ringbuf
     PRIV_REQUIRES bt
 )
 
