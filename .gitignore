@@ -2,20 +2,113 @@
 # ESP-IDF Build Artifacts
 # ==============================================================================
 build/
-managed_components/
-dependencies.lock
+**/build/
+bootloader/
+**/bootloader/
+partition_table/
+**/partition_table/
+
+# SDK configuration
 sdkconfig
+**/sdkconfig
 sdkconfig.old
+**/sdkconfig.old
+sdkconfig.defaults.old
+**/sdkconfig.defaults.old
+
+# ESP-IDF managed components
+managed_components/
+**/managed_components/
+dependencies.lock
+**/dependencies.lock
+
+# Build artifacts
+*.bin
+*.elf
+*.map
+*.hex
+*.uf2
+flash_args
+**/flash_args
+flasher_args.json
+**/flasher_args.json
+project_description.json
+**/project_description.json
+
+# ESP-IDF toolchain
+.espressif/
+
+# ==============================================================================
+# Models and Binary Data (ML projects only -- remove if not applicable)
+# ==============================================================================
+# models_py/
+# models_pvad/
+# models_espdl/
+
+# ==============================================================================
+# Python
+# ==============================================================================
+*.py[cod]
+*$py.class
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
 
 # ==============================================================================
 # IDE and Editor
 # ==============================================================================
+*.swp
+*.swo
+*.swn
+*~
+.*.sw?
+.cache/
+.clangd
+compile_commands.json
 .vscode/
+.idea/
 
 # ==============================================================================
-# Reference and Archive Code
+# Logs
+# ==============================================================================
+*.log
+logs/
+**/logs/
+
+# ==============================================================================
+# OS Generated Files
+# ==============================================================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+
+# ==============================================================================
+# Development and Archive (always gitignored -- local-only content)
 # ==============================================================================
 .archive/
 .docs/
 .old_code/
+.old_codes/
+.reference_code/
 .reference_codes/
+.data/
+tools_py/autonomous_dev/
