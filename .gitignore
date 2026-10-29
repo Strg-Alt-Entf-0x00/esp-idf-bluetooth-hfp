@@ -1,94 +1,30 @@
 # ============================================================================
-# Python
-# ============================================================================
-*.egg-info/
-*.py[cod]
-.pytest_cache/
-.venv/
-__pycache__/
-venv/
-
-# ============================================================================
 # ESP-IDF Build
 # ============================================================================
 **/build/
+**/managed_components/
 **/sdkconfig
-**/sdkconfig.defaults.old
 **/sdkconfig.old
-build/
+**/sdkconfig.defaults.old
 dependencies.lock
-managed_components/
-sdkconfig
-sdkconfig.defaults.old
-sdkconfig.old
 
 # ============================================================================
-# IDE
+# Logs
 # ============================================================================
-*.swo
-*.swp
-.idea/
-.vscode/
-
-# ============================================================================
-# Operating System
-# ============================================================================
-.DS_Store
-Thumbs.db
+**/.logs/
+*.log
 
 # ============================================================================
 # Project-specific Local Data
 # ============================================================================
 .archive/
-.cache/
+.backup/
 .data/
 .docs/
-.espressif/
-.old_code/
-.old_codes/
-.reference_code/
 .reference_codes/
 
 # ============================================================================
-# Other
+# IDE
 # ============================================================================
-*$py.class
-**/bootloader/
-**/dependencies.lock
-**/flash_args
-**/flasher_args.json
-**/logs/
-**/managed_components/
-**/partition_table/
-**/project_description.json
-*.bin
-*.elf
-*.hex
-*.log
-*.map
-*.swn
-*.uf2
-*~
-.*.sw?
-.AppleDouble
-.DS_Store?
-.LSOverride
-.Spotlight-V100
-.Trashes
-._*
+.vscode/
 .clangd
-.directory
-Desktop.ini
-ENV/
-Thumbs.db:encryptable
-bootloader/
-compile_commands.json
-dist/
-ehthumbs.db
-env/
-flash_args
-flasher_args.json
-logs/
-partition_table/
-project_description.json
-tools_py/autonomous_dev/
