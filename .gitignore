@@ -1,114 +1,94 @@
-# ==============================================================================
-# ESP-IDF Build Artifacts
-# ==============================================================================
-build/
-**/build/
-bootloader/
-**/bootloader/
-partition_table/
-**/partition_table/
-
-# SDK configuration
-sdkconfig
-**/sdkconfig
-sdkconfig.old
-**/sdkconfig.old
-sdkconfig.defaults.old
-**/sdkconfig.defaults.old
-
-# ESP-IDF managed components
-managed_components/
-**/managed_components/
-dependencies.lock
-**/dependencies.lock
-
-# Build artifacts
-*.bin
-*.elf
-*.map
-*.hex
-*.uf2
-flash_args
-**/flash_args
-flasher_args.json
-**/flasher_args.json
-project_description.json
-**/project_description.json
-
-# ESP-IDF toolchain
-.espressif/
-
-# ==============================================================================
-# Models and Binary Data (ML projects only -- remove if not applicable)
-# ==============================================================================
-# models_py/
-# models_pvad/
-# models_espdl/
-
-# ==============================================================================
+# ============================================================================
 # Python
-# ==============================================================================
+# ============================================================================
+*.egg-info/
 *.py[cod]
-*$py.class
-__pycache__/
 .pytest_cache/
 .venv/
+__pycache__/
 venv/
-env/
-ENV/
-*.egg-info/
-dist/
 
-# ==============================================================================
-# IDE and Editor
-# ==============================================================================
-*.swp
+# ============================================================================
+# ESP-IDF Build
+# ============================================================================
+**/build/
+**/sdkconfig
+**/sdkconfig.defaults.old
+**/sdkconfig.old
+build/
+dependencies.lock
+managed_components/
+sdkconfig
+sdkconfig.defaults.old
+sdkconfig.old
+
+# ============================================================================
+# IDE
+# ============================================================================
 *.swo
-*.swn
-*~
-.*.sw?
-.cache/
-.clangd
-compile_commands.json
-.vscode/
+*.swp
 .idea/
+.vscode/
 
-# ==============================================================================
-# Logs
-# ==============================================================================
-*.log
-logs/
-**/logs/
-
-# ==============================================================================
-# OS Generated Files
-# ==============================================================================
-# macOS
+# ============================================================================
+# Operating System
+# ============================================================================
 .DS_Store
-.DS_Store?
-._*
-.AppleDouble
-.LSOverride
-.Spotlight-V100
-.Trashes
-
-# Windows
 Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-Desktop.ini
 
-# Linux
-.directory
-
-# ==============================================================================
-# Development and Archive (always gitignored -- local-only content)
-# ==============================================================================
+# ============================================================================
+# Project-specific Local Data
+# ============================================================================
 .archive/
+.cache/
+.data/
 .docs/
+.espressif/
 .old_code/
 .old_codes/
 .reference_code/
 .reference_codes/
-.data/
+
+# ============================================================================
+# Other
+# ============================================================================
+*$py.class
+**/bootloader/
+**/dependencies.lock
+**/flash_args
+**/flasher_args.json
+**/logs/
+**/managed_components/
+**/partition_table/
+**/project_description.json
+*.bin
+*.elf
+*.hex
+*.log
+*.map
+*.swn
+*.uf2
+*~
+.*.sw?
+.AppleDouble
+.DS_Store?
+.LSOverride
+.Spotlight-V100
+.Trashes
+._*
+.clangd
+.directory
+Desktop.ini
+ENV/
+Thumbs.db:encryptable
+bootloader/
+compile_commands.json
+dist/
+ehthumbs.db
+env/
+flash_args
+flasher_args.json
+logs/
+partition_table/
+project_description.json
 tools_py/autonomous_dev/
