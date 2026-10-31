@@ -8,6 +8,8 @@ This is the initial extracted component release (`0.1.0`). It targets the ESP32 
 
 The component exposes Bluetooth and audio callbacks. It has no dependency on an application UART, PC protocol, or project-specific transport layer.
 
+See [CHANGELOG.md](CHANGELOG.md) for the recorded release history.
+
 ## Requirements
 
 - ESP-IDF 6.0.2 or newer

@@ -8,3 +8,12 @@ targets:
   - esp32
 dependencies:
   idf: ">=6.0.2"
+
+files:
+  exclude:
+    - "**/.*"
+    - "**/.*/**/*"
+    - "**/venv/**/*"
+    - "**/*.egg-info/**/*"
+    - "**/*.old"
+    - "**/*.bak"
