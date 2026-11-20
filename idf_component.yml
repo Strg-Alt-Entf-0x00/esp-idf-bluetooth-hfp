@@ -9,11 +9,3 @@ targets:
 dependencies:
   idf: ">=6.0.2"
 
-files:
-  exclude:
-    - "**/.*"
-    - "**/.*/**/*"
-    - "**/.venv/**/*"
-    - "**/*.egg-info/**/*"
-    - "**/*.old"
-    - "**/*.bak"
